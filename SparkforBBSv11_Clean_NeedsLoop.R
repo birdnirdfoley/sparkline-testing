@@ -14,18 +14,28 @@ library(cowplot) # for theme nothing
 # this csv file has the first column YEAR starting at 1966 
 # second column is called barpct and has 100 for atlas years and blank for non-atlas years
 # all subsequent columns have a four letter code followed by the estimated yearly relative abundance from BBS
-df <- read.csv("2023TEST.csv")
+# round all but the first 2 columns and pivot so species and relative abundance are a single column each
+df <- read.csv("2023TEST.csv") %>% 
+  mutate_at(vars(-barpct, -YEAR), funs(round(., 1))) %>%
+  pivot_longer(!c(YEAR, barpct), names_to = "species", values_to = "rel_abun")
 
-# round all but the first 2 columns
-df <- df %>% mutate_at(vars(-barpct, -YEAR), funs(round(., 1)))
+# get a species list
+birds <- unique(df$species)
+
+# create figures
+for(i in birds) {
+  df_bird <- df %>%
+    filter(species == i)
 
 #calculating highest and lowest for geom point
-highest <- subset(df, REVI == max(REVI))
-lowest <- subset(df, REVI == min(REVI))
+highest <- subset(df_bird, rel_abun == max(rel_abun)) %>% 
+    filter(YEAR == floor(median(YEAR)))
+lowest <- subset(df_bird, rel_abun == min(rel_abun)) %>% 
+    filter(YEAR == floor(median(YEAR)))
 
 #Extracting numbers for labels
-highest2 <- data.frame(highest$REVI)
-lowest2 <- data.frame(lowest$REVI)
+highest2 <- data.frame(highest$rel_abun)
+lowest2 <- data.frame(lowest$rel_abun)
 
 # ggplot, prints the plot
 # geom col is the bar chart
@@ -33,12 +43,12 @@ lowest2 <- data.frame(lowest$REVI)
 # points are the red and blue max and min
 # text are the point labels
 # theme nothing makes the plot axis etc vanish
-t1 <- ggplot() + geom_col(data=df, aes(x=YEAR, y=barpct), fill="pink", width = 1) +
-                 geom_line(data = df, aes(x=YEAR, y=REVI), size = 0.5) +
-                 geom_point(data = lowest, aes(x=YEAR, y=REVI), size = 0.2, color = "red") + 
-                 geom_point(data = highest, aes(x=YEAR, y=REVI), size = 0.2, color = "blue") +
-                 geom_text(data = highest, aes(x=YEAR, y=REVI), label=highest2, position = position_nudge(y = 12), size  = 2, vjust="inward", hjust="inward", family = "Gill Sans MT") +
-                 geom_text(data = lowest, aes(x=YEAR, y=REVI), label=lowest2, position = position_nudge(y = -12), size = 2, vjust="inward", hjust="inward", family = "Gill Sans MT") +
+t1 <- ggplot() + geom_col(data=df_bird, aes(x=YEAR, y=barpct), fill="pink", width = 1) +
+                 geom_line(data = df_bird, aes(x=YEAR, y=rel_abun), size = 0.5) +
+                 geom_point(data = lowest, aes(x=YEAR, y=rel_abun), size = 0.2, color = "red") + 
+                 geom_point(data = highest, aes(x=YEAR, y=rel_abun), size = 0.2, color = "blue") +
+                 geom_text(data = highest, aes(x=YEAR, y=rel_abun), label=highest2, position = position_nudge(y = 12), size  = 2, vjust="inward", hjust="inward", family = "Gill Sans MT") +
+                 geom_text(data = lowest, aes(x=YEAR, y=rel_abun), label=lowest2, position = position_nudge(y = -12), size = 2, vjust="inward", hjust="inward", family = "Gill Sans MT") +
                  theme_nothing()
 
 # this will generate an error message about removing 43 rows, but those are the NA values for non-atlas years
@@ -47,7 +57,8 @@ t1 <- ggplot() + geom_col(data=df, aes(x=YEAR, y=barpct), fill="pink", width = 1
 # NEED TO FURTHER TWEAK DIMENSIONS, which can be done with width and height here
 # the cairo_ps setting allows postscript to actually print Gill Sans
 # print to file
-ggplot2::ggsave(filename = "tPlot.eps", 
+file_name <- paste("plot_", i, ".eps", sep="")
+ggplot2::ggsave(filename = file_name, 
                 plot = t1, 
                 device = cairo_ps, 
                 dpi = 1200, 
@@ -55,7 +66,7 @@ ggplot2::ggsave(filename = "tPlot.eps",
                 height = 2, 
                 units = "cm")
 
-
+}
 
 
 
